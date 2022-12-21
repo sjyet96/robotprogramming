@@ -14,19 +14,12 @@ import numpy as np
 from scipy.signal import butter, lfilter
 from scipy import signal
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import precision_score, recall_score, accuracy_score, f1_score
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import LabelEncoder
 
 def HPF2(series, cutoff,fs, order=1):
-    '''
-    series : 데이터
-    high : 최고 구간(0< low < 1)
-    order : 필터 계수, 높을수록 민감
-    '''
     nyq = 0.5*fs
     cutoff = cutoff/nyq
-    
     b, a = butter(
                   N = order,
                   Wn = cutoff,
@@ -38,14 +31,8 @@ def HPF2(series, cutoff,fs, order=1):
 
 
 def LPF(series, cutoff,fs, order=3):
-    '''
-    series : 데이터
-    low : 최저 구간(0< low < 1)
-    order : 필터 계수, 높을수록 민감
-    '''
     nyq = 0.5*fs
     cutoff = cutoff/nyq
-    
     b, a = butter(
                   N = order,
                   Wn = cutoff,
@@ -123,24 +110,6 @@ def train_preprocess(train_df):
     y = train_df.label
     train_df.drop(['label'], axis = 1, inplace = True)
     train_df.to_csv('testdata.csv')
-    '''
-    # 시간간격 0.1초
-    #train_df.drop(['Unnamed: 0'], axis = 1 , inplace = True)
-    train_df['timestamp_f'] = train_df['timestamp_mod'].apply(lambda x : np.round(x, 1))
-    train_df_sec = train_df.drop_duplicates(['timestamp_f'], keep='first')
-    train_df_sec.drop(['timestamp_mod'], axis = 1, inplace = True)
-    
-    # 변화량
-    y = train_df_sec.label
-    train_df_sec.drop(['label', 'timestamp_f'], axis = 1, inplace = True)
-    train_df_diff = pd.DataFrame(columns = train_df_sec.columns)
-    for i in train_df_sec.columns[:12]:
-        train_df_diff[i] = (train_df_sec[i].diff().fillna(0))
-    train_df_diff.reset_index(drop = True, inplace=True)
-    train_df_diff.to_csv('testdata.csv')
-    
-    return train_df_diff, y
-    '''
     return train_df, y
 
 def train(feature_df, label):
@@ -222,15 +191,21 @@ class Light():
 
         return self.model
 
+    def check_beacon(self):
+        self.env_red = self.env.red      #빨간색 성분
+        self.env_green = self.env.green  #초록색 성분 
+        self.env_blue = self.env.blue    #파란색 성분
+        if (self.env_green+self.env_blue)*4< self.env_red:   # 빨간색이 나머지 두개합친것보다 4배 높을때
+            print('비콘 감지! 위치 보정')
+            return True
 
-
-    def check_botton(self): # 버튼 체크
+    def check_button(self): # 버튼 체크
         if self.button.toggled==True:
             self.led.turn_on()
         elif  self.button.toggled == False:
             self.led.turn_off()
         if self.button.double_clicked:
-            self.speaker.tune = 550, 10
+            self.speaker.tune = 1000, 1000
         elif self.button.pressed:
             self.speaker.turn_off()
 
@@ -296,28 +271,6 @@ class Light():
         self.gyroscope = self.rawdata[1:, 1:4]
         self.accelerometer = self.rawdata[1:, 4:7] #4:7 - acc, 7:10 - bacc, 10:13 - gacc
         self.movingpredict = self.data[:,13]
-        '''
-        self.figure, self.axes = pyplot.subplots(nrows=6, sharex=True, gridspec_kw={"height_ratios": [6, 6, 6, 2, 1, 1]})
-
-        self.figure.suptitle("Sensors data, Euler angles, and AHRS internal states")
-
-        self.axes[0].plot(self.timestamp, self.gyroscope[:, 0], "tab:red", label="Gyroscope X")
-        self.axes[0].plot(self.timestamp, self.gyroscope[:, 1], "tab:green", label="Gyroscope Y")
-        self.axes[0].plot(self.timestamp, self.gyroscope[:, 2], "tab:blue", label="Gyroscope Z")
-        self.axes[0].set_ylabel("Degrees/s")
-        self.axes[0].grid()
-        self.axes[0].legend()
-
-        self.axes[1].plot(self.timestamp, self.accelerometer[:, 0], "tab:red", label="Accelerometer X")
-        self.axes[1].plot(self.timestamp, self.accelerometer[:, 1], "tab:green", label="Accelerometer Y")
-        self.axes[1].plot(self.timestamp, self.accelerometer[:, 2], "tab:blue", label="Accelerometer Z")
-        self.axes[1].set_ylabel("g")
-        self.axes[1].grid()
-        self.axes[1].legend()
-        '''
-        #self.accelerometer[:,0] = LPF(self.accelerometer[:,0], 50,self.sample_rate, 3)
-        #self.accelerometer[:,1] = LPF(self.accelerometer[:,1], 50,self.sample_rate, 3)
-        #self.accelerometer[:,2] = LPF(self.accelerometer[:,2], 50,self.sample_rate, 3)
 
         # Intantiate AHRS algorithms
         self.offset = imufusion.Offset(self.sample_rate)
@@ -353,19 +306,6 @@ class Light():
         self.acceleration[:, 1] = HPF(self.acceleration[:, 1], 0.3,self.sample_rate, 3)
         self.acceleration[:, 2] = HPF(self.acceleration[:, 2], 0.3,self.sample_rate, 3)
 
-        '''
-        # Plot acceleration
-        _, self.axes = pyplot.subplots(nrows=4, sharex=True, gridspec_kw={"height_ratios": [6, 1, 6, 6]})
-
-        self.axes[0].plot(self.timestamp, self.acceleration[:, 0], "tab:red", label="X")
-        self.axes[0].plot(self.timestamp, self.acceleration[:, 1], "tab:green", label="Y")
-        self.axes[0].plot(self.timestamp, self.acceleration[:, 2], "tab:blue", label="Z")
-        self.axes[0].set_title("Acceleration")
-        self.axes[0].set_ylabel("m/s/s")
-        self.axes[0].grid()
-        self.axes[0].legend()
-        '''
-
 
         # Identify moving periods
         self.is_moving = numpy.empty(len(self.timestamp))
@@ -379,16 +319,6 @@ class Light():
 
         for index in range(len(self.timestamp) - 1, self.margin, -1):
             self.is_moving[index] = any(self.is_moving[(index - self.margin):index])  # add trailing margin
-
-
-        '''
-        # Plot moving periods
-        self.axes[1].plot(self.timestamp, self.is_moving, "tab:cyan", label="Is moving")
-        pyplot.sca(self.axes[1])
-        pyplot.yticks([0, 1], ["False", "True"])
-        self.axes[1].grid()
-        self.axes[1].legend()
-        '''
         
         # Calculate velocity (includes integral drift)
         self.velocity = numpy.zeros((len(self.timestamp), 3))
@@ -440,17 +370,7 @@ class Light():
             self.velocity_drift[self.start_index:(self.stop_index + 1), 2] = interp1d(self.t, self.z)(self.t_new)
 
         self.velocity = self.velocity - self.velocity_drift
-        '''
-        # Plot velocity
-        self.axes[2].plot(self.timestamp, self.velocity[:, 0], "tab:red", label="X")
-        self.axes[2].plot(self.timestamp, self.velocity[:, 1], "tab:green", label="Y")
-        self.axes[2].plot(self.timestamp, self.velocity[:, 2], "tab:blue", label="Z")
-        self.axes[2].set_title("Velocity")
-        self.axes[2].set_ylabel("m/s")
-        self.axes[2].grid()
-        self.axes[2].legend()
-        '''
-
+    
         # Calculate position
         self.position = numpy.zeros((len(self.timestamp), 3))
         self.position[:, 2] = signal.detrend(self.position[:, 2])
@@ -462,19 +382,7 @@ class Light():
                 self.last_index = index
             else : self.last_index = 0
             self.position[index] = self.position[index - 1] + self.delta_time[index] * self.velocity[index]
-        '''
-        # Plot position
-        self.axes[3].plot(self.timestamp, self.position[:, 0], "tab:red", label="X")
-        self.axes[3].plot(self.timestamp, self.position[:, 1], "tab:green", label="Y")
-        self.axes[3].plot(self.timestamp, self.position[:, 2], "tab:blue", label="Z")
-        self.axes[3].set_title("Position")
-        self.axes[3].set_xlabel("Seconds")
-        self.axes[3].set_ylabel("m")
-        self.axes[3].grid()
-        self.axes[3].legend()
-        pyplot.show()
-        '''
-
+   
 
         # Print error as distance between start and final positions
         #print("Error: " + "{:.3f}".format(numpy.sqrt(self.position[-1].dot(self.position[-1]))) + " m")
